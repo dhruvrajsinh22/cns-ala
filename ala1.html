@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ALA 1 — Digital Signature Verifier</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #faf7f2;
+    --surface: #ffffff;
+    --surface2: #f5f0e8;
+    --border: #e8dfd0;
+    --border-accent: rgba(217,119,6,0.3);
+    --accent: #b45309;
+    --accent-light: #d97706;
+    --accent2: #dc2626;
+    --accent-dim: rgba(217,119,6,0.08);
+    --text: #1c1008;
+    --muted: #78716c;
+    --green: #16a34a;
+    --shadow: rgba(120,83,0,0.1);
+    --shadow-strong: rgba(120,83,0,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    min-height: 100vh;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 70% 50% at 0% 0%, rgba(251,191,36,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 40% at 100% 100%, rgba(220,38,38,0.07) 0%, transparent 60%);
+    pointer-events: none; z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      radial-gradient(circle, rgba(180,83,9,0.06) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none; z-index: 0;
+  }
+
+  .top-bar {
+    position: relative; z-index: 10;
+    border-bottom: 2px solid var(--border);
+    padding: 14px 32px;
+    display: flex; align-items: center; gap: 16px;
+    background: rgba(250,247,242,0.92);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 2px 12px var(--shadow);
+  }
+  .back-btn {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 600;
+    padding: 6px 14px; border-radius: 8px;
+    border: 1px solid transparent;
+    transition: all 0.25s;
+  }
+  .back-btn:hover {
+    color: var(--accent); background: var(--accent-dim);
+    border-color: var(--border-accent);
+    box-shadow: 0 2px 8px var(--shadow);
+  }
+  .breadcrumb { font-size: 13px; color: var(--muted); }
+  .breadcrumb span { color: var(--accent); font-weight: 700; }
+
+  .student-tag {
+    margin-left: auto; font-size: 12px; color: var(--muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .student-name {
+    background: linear-gradient(135deg, var(--accent-light), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; font-weight: 700; font-size: 13px;
+  }
+
+  main {
+    position: relative; z-index: 1;
+    max-width: 920px; margin: 0 auto;
+    padding: 52px 24px 90px;
+  }
+
+  .ala-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--accent-dim);
+    border: 1px solid var(--border-accent);
+    color: var(--accent-light);
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700;
+    padding: 6px 16px; border-radius: 100px; margin-bottom: 24px;
+    box-shadow: 0 2px 12px var(--shadow);
+  }
+  .ala-badge::before { content: '⬡'; font-size: 10px; }
+
+  h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 900; line-height: 1.05; margin-bottom: 20px;
+    letter-spacing: -0.02em; color: var(--text);
+  }
+  h1 .accent {
+    background: linear-gradient(135deg, var(--accent-light), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 48px;
+  }
+  .meta-item {
+    font-size: 12px; color: var(--muted); font-weight: 600;
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 5px 14px; border-radius: 100px;
+    box-shadow: 0 1px 4px var(--shadow);
+    transition: all 0.2s;
+  }
+  .meta-item:hover { color: var(--accent); border-color: var(--border-accent); }
+
+  section { margin-bottom: 52px; }
+
+  h2 {
+    font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700;
+    margin-bottom: 18px; display: flex; align-items: center; gap: 12px;
+    color: var(--accent); letter-spacing: 0.12em; text-transform: uppercase;
+  }
+  h2::before { content: '▸'; color: var(--accent2); font-size: 14px; }
+  h2::after {
+    content: ''; flex: 1; height: 2px;
+    background: linear-gradient(90deg, var(--border-accent), transparent);
+    border-radius: 2px;
+  }
+
+  .objective-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent-light);
+    border-radius: 12px; padding: 24px 28px;
+    font-size: 14px; color: var(--muted); line-height: 1.9;
+    box-shadow: 0 4px 20px var(--shadow);
+  }
+  .objective-box strong { color: var(--text); }
+
+  /* Flow diagram */
+  .flow {
+    display: flex; align-items: center; gap: 0;
+    overflow-x: auto; padding: 8px 0 16px;
+  }
+  .flow-step {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 14px; padding: 18px 22px;
+    text-align: center; min-width: 140px; flex-shrink: 0;
+    transition: all 0.25s;
+    box-shadow: 0 2px 8px var(--shadow);
+    position: relative; overflow: hidden;
+  }
+  .flow-step::after {
+    content: ''; position: absolute;
+    bottom: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--accent-light), var(--accent2));
+    transform: scaleX(0); transition: transform 0.3s;
+  }
+  .flow-step:hover {
+    border-color: var(--border-accent);
+    box-shadow: 0 8px 24px var(--shadow-strong);
+    transform: translateY(-4px);
+  }
+  .flow-step:hover::after { transform: scaleX(1); }
+  .flow-step .icon { font-size: 26px; margin-bottom: 10px; }
+  .flow-step .label { font-size: 12px; font-weight: 700; color: var(--text); letter-spacing: 0.04em; }
+  .flow-step .sublabel { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .flow-arrow { color: var(--accent-light); font-size: 22px; padding: 0 14px; flex-shrink: 0; opacity: 0.7; }
+
+  /* Code block */
+  .code-wrap {
+    background: #1a1208;
+    border: 1px solid rgba(180,83,9,0.2);
+    border-radius: 14px; overflow: hidden;
+    box-shadow: 0 8px 32px var(--shadow-strong);
+  }
+  .code-header {
+    background: #241a0c;
+    border-bottom: 1px solid rgba(180,83,9,0.2);
+    padding: 12px 20px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .code-header .dots { display: flex; gap: 7px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot-r { background: #ff5f57; box-shadow: 0 0 6px rgba(255,95,87,0.5); }
+  .dot-y { background: #febc2e; box-shadow: 0 0 6px rgba(254,188,46,0.5); }
+  .dot-g { background: #28c840; box-shadow: 0 0 6px rgba(40,200,64,0.5); }
+  .code-title { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8a7560; }
+  .code-lang {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    background: rgba(217,119,6,0.15); color: #d97706;
+    border: 1px solid rgba(217,119,6,0.3);
+    padding: 3px 12px; border-radius: 6px; letter-spacing: 0.12em;
+  }
+  pre {
+    padding: 24px; overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px; line-height: 1.85; color: #e8d5b5;
+    tab-size: 4;
+  }
+  .kw { color: #fb923c; }
+  .fn { color: #fbbf24; }
+  .st { color: #86efac; }
+  .cm { color: #4a3f2e; font-style: italic; }
+  .nm { color: #f472b6; }
+  .op { color: #c4a97a; }
+
+  /* Output box */
+  .output-box {
+    background: #0d0804;
+    border: 1px solid rgba(180,83,9,0.2);
+    border-radius: 14px; overflow: hidden;
+    box-shadow: 0 8px 32px var(--shadow-strong);
+  }
+  .output-header {
+    background: #1a1208;
+    border-bottom: 1px solid rgba(180,83,9,0.2);
+    padding: 12px 20px;
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8a7560;
+  }
+  .output-header::before { content: '●'; color: #28c840; font-size: 10px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+  .output-body { padding: 20px 24px; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 2; }
+  .out-line { color: #8a7560; }
+  .out-val { color: #fbbf24; word-break: break-all; }
+  .out-ok { color: #4ade80; font-weight: 700; }
+  .out-label { color: #fb923c; }
+
+  /* Analysis cards */
+  .analysis-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .analysis-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 14px; padding: 22px;
+    box-shadow: 0 2px 12px var(--shadow);
+    transition: all 0.3s; position: relative; overflow: hidden;
+  }
+  .analysis-card::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--accent-light), var(--accent2));
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .analysis-card:hover { box-shadow: 0 8px 32px var(--shadow-strong); transform: translateY(-3px); }
+  .analysis-card:hover::before { opacity: 1; }
+  .analysis-card h3 { font-size: 14px; font-weight: 700; color: var(--accent); margin-bottom: 10px; }
+  .analysis-card p { font-size: 13px; color: var(--muted); line-height: 1.8; }
+
+  /* Steps */
+  .steps { display: flex; flex-direction: column; gap: 12px; }
+  .step {
+    display: flex; align-items: flex-start; gap: 16px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 12px; padding: 18px 20px;
+    box-shadow: 0 2px 8px var(--shadow);
+    transition: all 0.2s;
+  }
+  .step:hover { border-color: var(--border-accent); box-shadow: 0 4px 16px var(--shadow-strong); }
+  .step-num {
+    width: 32px; height: 32px; border-radius: 10px;
+    background: var(--accent-dim); border: 1.5px solid var(--border-accent);
+    color: var(--accent-light); font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .step-text { font-size: 13px; color: var(--muted); line-height: 1.7; }
+  .step-text strong { color: var(--text); }
+
+  @media (max-width: 600px) {
+    main { padding: 32px 16px 60px; }
+    .flow { gap: 8px; }
+    .flow-step { min-width: 120px; padding: 12px 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="top-bar">
+  <a href="index.html" class="back-btn">← Back</a>
+  <span class="breadcrumb">Dashboard / <span>ALA 1</span></span>
+  <div class="student-tag">
+    <span>Student:</span>
+    <span class="student-name">Jadeja Dhruvrajsinh</span>
+  </div>
+</div>
+
+<main>
+  <div class="ala-badge">ALA 1 — Digital Signature</div>
+  <h1>Digital Signature<br><span class="accent">Verifier</span></h1>
+  <div class="meta">
+    <span class="meta-item">Python 3.x</span>
+    <span class="meta-item">RSA + SHA-256</span>
+    <span class="meta-item">Public-Key Cryptography</span>
+    <span class="meta-item">cryptography library</span>
+  </div>
+
+  <!-- Objective -->
+  <section>
+    <h2>Objective</h2>
+    <div class="objective-box">
+      Implement a <strong>Digital Signature System</strong> using Python to understand public-key cryptography. Generate an RSA key pair, sign a message using the private key, and verify the signature using the public key. SHA-256 hashing ensures message integrity before signing.
+    </div>
+  </section>
+
+  <!-- Flow -->
+  <section>
+    <h2>Process Flow</h2>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="icon">🔑</div>
+        <div class="label">Key Generation</div>
+        <div class="sublabel">RSA 2048-bit</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="icon">💬</div>
+        <div class="label">Message Input</div>
+        <div class="sublabel">Plaintext</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="icon">#️⃣</div>
+        <div class="label">SHA-256 Hash</div>
+        <div class="sublabel">Digest</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="icon">✍️</div>
+        <div class="label">RSA Sign</div>
+        <div class="sublabel">Private Key</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="icon">✅</div>
+        <div class="label">Verify</div>
+        <div class="sublabel">Public Key</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section>
+    <h2>How It Works</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>Key Generation:</strong> An RSA 2048-bit key pair (private + public) is generated using Python's <code>cryptography</code> library.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text"><strong>Hashing:</strong> The message is hashed using SHA-256 to create a fixed-size digest, ensuring integrity.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text"><strong>Signing:</strong> The private key signs the message digest using RSA-PSS padding, creating the digital signature.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text"><strong>Verification:</strong> The public key verifies the signature against the original message. A mismatch means tampering.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Source Code -->
+  <section>
+    <h2>Source Code</h2>
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+        <span class="code-title">digital_signature.py</span>
+        <span class="code-lang">PYTHON</span>
+      </div>
+      <pre><span class="cm"># ALA 1: Digital Signature Verifier
+# Implements RSA key pair generation, signing, and verification</span>
+
+<span class="kw">from</span> cryptography.hazmat.primitives.asymmetric <span class="kw">import</span> rsa, padding
+<span class="kw">from</span> cryptography.hazmat.primitives <span class="kw">import</span> hashes
+<span class="kw">from</span> cryptography.hazmat.backends <span class="kw">import</span> default_backend
+<span class="kw">from</span> cryptography.exceptions <span class="kw">import</span> InvalidSignature
+<span class="kw">import</span> base64
+
+<span class="cm"># ─── Step 1: Generate RSA Key Pair ───────────────────────────────────────────</span>
+<span class="kw">def</span> <span class="fn">generate_keys</span>():
+    private_key = rsa.<span class="fn">generate_private_key</span>(
+        public_exponent=<span class="nm">65537</span>,
+        key_size=<span class="nm">2048</span>,
+        backend=<span class="fn">default_backend</span>()
+    )
+    public_key = private_key.<span class="fn">public_key</span>()
+    <span class="kw">return</span> private_key, public_key
+
+<span class="cm"># ─── Step 2: Sign a Message ───────────────────────────────────────────────────</span>
+<span class="kw">def</span> <span class="fn">sign_message</span>(private_key, message: <span class="fn">str</span>):
+    message_bytes = message.<span class="fn">encode</span>(<span class="st">'utf-8'</span>)
+    signature = private_key.<span class="fn">sign</span>(
+        message_bytes,
+        padding.<span class="fn">PSS</span>(
+            mgf=padding.<span class="fn">MGF1</span>(hashes.<span class="fn">SHA256</span>()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.<span class="fn">SHA256</span>()
+    )
+    <span class="kw">return</span> signature
+
+<span class="cm"># ─── Step 3: Verify the Signature ────────────────────────────────────────────</span>
+<span class="kw">def</span> <span class="fn">verify_signature</span>(public_key, message: <span class="fn">str</span>, signature):
+    message_bytes = message.<span class="fn">encode</span>(<span class="st">'utf-8'</span>)
+    <span class="kw">try</span>:
+        public_key.<span class="fn">verify</span>(
+            signature,
+            message_bytes,
+            padding.<span class="fn">PSS</span>(
+                mgf=padding.<span class="fn">MGF1</span>(hashes.<span class="fn">SHA256</span>()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.<span class="fn">SHA256</span>()
+        )
+        <span class="kw">return True</span>
+    <span class="kw">except</span> InvalidSignature:
+        <span class="kw">return False</span>
+
+<span class="cm"># ─── Main Execution ───────────────────────────────────────────────────────────</span>
+<span class="kw">if</span> __name__ == <span class="st">"__main__"</span>:
+    message = <span class="st">"Hello, this is a secure message from the sender!"</span>
+
+    <span class="fn">print</span>(<span class="st">"=== Digital Signature Verifier ==="</span>)
+    <span class="fn">print</span>(<span class="fn">f</span><span class="st">"\n[*] Original Message : {message}"</span>)
+
+    private_key, public_key = <span class="fn">generate_keys</span>()
+    <span class="fn">print</span>(<span class="st">"\n[+] RSA Key Pair Generated (2048-bit)"</span>)
+
+    signature = <span class="fn">sign_message</span>(private_key, message)
+    sig_b64 = base64.<span class="fn">b64encode</span>(signature).<span class="fn">decode</span>()
+    <span class="fn">print</span>(<span class="fn">f</span><span class="st">"\n[+] Signature (base64):\n    {sig_b64[:64]}..."</span>)
+
+    result = <span class="fn">verify_signature</span>(public_key, message, signature)
+    <span class="fn">print</span>(<span class="fn">f</span><span class="st">"\n[✓] Signature Valid for original message : {result}"</span>)
+
+    tampered = <span class="st">"Hello, this is a TAMPERED message!"</span>
+    result_tampered = <span class="fn">verify_signature</span>(public_key, tampered, signature)
+    <span class="fn">print</span>(<span class="fn">f</span><span class="st">"[✗] Signature Valid for tampered message  : {result_tampered}"</span>)</pre>
+    </div>
+  </section>
+
+  <!-- Output -->
+  <section>
+    <h2>Expected Output</h2>
+    <div class="output-box">
+      <div class="output-header">Terminal Output — digital_signature.py</div>
+      <div class="output-body">
+        <div class="out-line">═══ Digital Signature Verifier ═══</div>
+        <br>
+        <div class="out-line"><span class="out-label">[*] Original Message</span> : Hello, this is a secure message from the sender!</div>
+        <br>
+        <div class="out-line"><span class="out-ok">[+] RSA Key Pair Generated (2048-bit)</span></div>
+        <br>
+        <div class="out-line"><span class="out-label">[+] Signature (base64):</span></div>
+        <div class="out-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="out-val">mQINBF2WlBUBEAC7xZ3g+Lkm7vYR...</span></div>
+        <br>
+        <div class="out-line"><span class="out-ok">[✓] Signature Valid for original message : True</span></div>
+        <div class="out-line" style="color:#f87171">[✗] Signature Valid for tampered message  : False</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Analysis -->
+  <section>
+    <h2>Analysis</h2>
+    <div class="analysis-grid">
+      <div class="analysis-card">
+        <h3>🔐 Why RSA?</h3>
+        <p>RSA is an asymmetric algorithm — what the private key signs, only the public key can verify. This enables non-repudiation and authentication without sharing secret keys.</p>
+      </div>
+      <div class="analysis-card">
+        <h3>#️⃣ Role of SHA-256</h3>
+        <p>Hashing compresses any message to a fixed 256-bit digest. Signing the hash (not the full message) is faster and the hash ensures any modification to the message is detectable.</p>
+      </div>
+      <div class="analysis-card">
+        <h3>🧪 Tamper Detection</h3>
+        <p>When the tampered message is verified, the computed hash doesn't match the signed hash, so verification fails — proving the system correctly detects data tampering.</p>
+      </div>
+      <div class="analysis-card">
+        <h3>📦 PSS Padding</h3>
+        <p>RSA-PSS (Probabilistic Signature Scheme) adds randomized salt to prevent deterministic attacks. Each signature of the same message produces a different output.</p>
+      </div>
+    </div>
+  </section>
+</main>
+</body>
+</html>
